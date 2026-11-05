@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-SharePoint 上の PDF/Word（約5,000件）を対象にした RAG ナレッジ検索 + Slack ボット（MVP）。**実装中**（Git 管理外のローカルフォルダ）。
+SharePoint 上の PDF/Word（約5,000件）を対象にした RAG ナレッジ検索 + Slack ボット（MVP）。**実装中**（GitHub 公開リポジトリ `iru-heartbeat/rag-knowledge-slack`。秘密情報は `.env.local` のみで Git に含めない）。
 
 **実装済み（テスト全件緑・typecheck OK。SharePoint 実接続と Slack 実投稿は未確認）**
 - 基盤: `src/lib/config.ts`（設定の集約）、`src/lib/supabase.ts`（service_role クライアント）。`supabase.ts` / `embed.ts` / `graph/client.ts` / `rag/answer.ts` / `slack/client.ts` などは `import "server-only"` 済み（テストでは `vitest.config.ts` が空スタブに差し替える）。
