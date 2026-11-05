@@ -5,3 +5,7 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 .claude/
+
+.vercel
+.env*
+!.env.example
