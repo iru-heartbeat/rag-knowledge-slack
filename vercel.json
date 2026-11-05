@@ -1,0 +1,7 @@
+{
+  "crons": [{ "path": "/api/cron/sync", "schedule": "0 18 1 * *" }],
+  "functions": {
+    "src/app/api/cron/sync/route.ts": { "maxDuration": 300 },
+    "src/app/api/slack/events/route.ts": { "maxDuration": 60 }
+  }
+}
