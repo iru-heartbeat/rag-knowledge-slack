@@ -8,7 +8,9 @@ import { runSync } from "./run";
 type Row = Record<string, unknown>;
 
 /** Supabase の偽物。runSync が使う書き込みを記録し、sync_state だけは状態を持つ */
-function fakeDb(init: { cursor?: string; runningRuns?: number } = {}) {
+function fakeDb(
+  init: { cursor?: string; runningRuns?: number; cursorLoadError?: string; runUpdateError?: string } = {},
+) {
   const state = new Map<string, string>(init.cursor ? [["sync:test", init.cursor]] : []);
   const log = {
     runUpdates: [] as Row[],
@@ -27,9 +29,16 @@ function fakeDb(init: { cursor?: string; runningRuns?: number } = {}) {
         if ((init.runningRuns ?? 0) > 0) return { data: null, error: { code: "23505", message: "duplicate key" } };
         return { data: { id: 1 }, error: null };
       }
-      if (table === "ingestion_runs" && op === "update") log.runUpdates.push(payload);
+      if (table === "ingestion_runs" && op === "update") {
+        log.runUpdates.push(payload);
+        // 「running」の整理（古い記録を error にする更新）は成功させ、完了の記録だけを失敗させる
+        if (init.runUpdateError && payload.total !== undefined) return { data: null, error: { message: init.runUpdateError } };
+      }
       if (table === "ingestion_errors" && op === "insert") log.errors.push(payload);
       if (table === "documents" && op === "update") log.deletes.push(eqVal as string);
+      if (table === "sync_state" && op === "select" && init.cursorLoadError) {
+        return { data: null, error: { message: init.cursorLoadError } };
+      }
       if (table === "sync_state" && op === "select") {
         const v = state.get(eqVal as string);
         return { data: v === undefined ? null : { value: v }, error: null };
@@ -258,6 +267,25 @@ describe("runSync", () => {
     expect(r.status).toBe("error");
     expect(state.get("sync:test")).toBe("p0");
     expect(log.errors[0].error_message).toContain("入手元が落ちています");
+  });
+
+  describe("想定外の失敗（DB の障害など）のとき（レビュー指摘）", () => {
+    it("元のエラーを呼び出し側に伝え、後始末（完了の記録）の失敗で上書きしない。run は error として閉じようとする", async () => {
+      // 進捗の読み込みで失敗 → 後始末の「完了の記録」も DB 障害で失敗する、という二重の失敗
+      const { db, log } = fakeDb({ cursorLoadError: "cursor boom", runUpdateError: "db down" });
+      const { source } = fakeSource([{ items: [] }]);
+
+      await expect(runSync(db, source, { ...base, ingest: vi.fn() })).rejects.toThrow(/cursor boom/);
+
+      expect(log.errors.at(-1)?.error_message).toContain("cursor boom"); // 失敗は記録される
+      expect(log.runUpdates.some((u) => u.status === "error")).toBe(true); // 閉じる試みはした
+    });
+
+    it("最後の完了の記録だけが失敗したときは、その失敗を伝える（元のエラーは無いので、隠さない）", async () => {
+      const { db } = fakeDb({ runUpdateError: "db down" });
+      const { source } = fakeSource([{ items: [file("a")] }]);
+      await expect(runSync(db, source, { ...base, ingest: vi.fn(async () => saved) })).rejects.toThrow(/db down/);
+    });
   });
 
   it("すでに実行中の同期があれば、二重に動かさない", async () => {

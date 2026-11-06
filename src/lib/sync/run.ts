@@ -129,7 +129,10 @@ export async function runSync(
     // 想定外（DB の障害など）。実行中のまま残さず error として閉じてから、呼び出し側にも伝える
     result.status = "error";
     await recordError(db, runId, null, "(同期全体)", messageOf(e));
-    await finish(db, result);
+    // 閉じる記録も DB 障害で失敗しうる。その失敗で元のエラーを隠さない（失敗しても、古い running は10分後に整理される）
+    await finish(db, result).catch((finishError) =>
+      console.error(`同期の終了の記録にも失敗しました: ${messageOf(finishError)}`),
+    );
     throw e;
   }
 }

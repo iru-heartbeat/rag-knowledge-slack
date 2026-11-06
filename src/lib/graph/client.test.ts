@@ -124,6 +124,33 @@ describe("createGraphClient.fetchDeltaPage", () => {
     expect(n).toBe(2);
   });
 
+  describe("再試行の待ち時間（レビュー指摘: Retry-After が無いと待たずに連打していた）", () => {
+    /** 常に指定の応答を返し続け、待ち時間を記録して、失敗するまでの待ちを返す */
+    async function waitsFor(headers: Record<string, string>) {
+      const waits: number[] = [];
+      const { fetch } = fakeFetch([
+        ["/oauth2/v2.0/token", token],
+        ["/root/delta", () => json({}, 503, headers)],
+      ]);
+      const client = createGraphClient(ENV, fetch, { sleep: async (ms) => void waits.push(ms) });
+      await expect(client.fetchDeltaPage(null)).rejects.toThrow(/503/);
+      return waits;
+    }
+
+    it("Retry-After が無いときは、1秒→2秒→4秒と待ってから再試行する", async () => {
+      expect(await waitsFor({})).toEqual([1000, 2000, 4000]);
+    });
+
+    it("Retry-After が数値でない（日付形式など）ときも、同じ段階的な待ちにする", async () => {
+      expect(await waitsFor({ "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" })).toEqual([1000, 2000, 4000]);
+      expect(await waitsFor({ "retry-after": "" })).toEqual([1000, 2000, 4000]);
+    });
+
+    it("Retry-After が数値のときは、その秒数に従う", async () => {
+      expect(await waitsFor({ "retry-after": "3" })).toEqual([3000, 3000, 3000]);
+    });
+  });
+
   it("再試行しても失敗し続けたら、ステータス付きのエラー", async () => {
     const { fetch } = fakeFetch([
       ["/oauth2/v2.0/token", token],

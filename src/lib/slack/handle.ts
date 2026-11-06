@@ -1,3 +1,4 @@
+import { config } from "../config";
 import type { AnswerResult } from "../rag/answer";
 import type { RetrievedChunk } from "../rag/retrieve";
 import { formatReply, type SlackReply } from "./format";
@@ -31,7 +32,8 @@ const MSG_UNREGISTERED =
   "このSlackアカウントは、まだナレッジ検索の利用者として登録されていません。管理者に登録を依頼してください。（Slack に登録されている会社のメールアドレスで照合します）";
 const MSG_QUOTA = "短い間に質問が続いたため、しばらく時間をおいてからもう一度お試しください。";
 const MSG_EMPTY = "質問を入力してください。例: 「@ナレッジ検索 地方銀行向けDX提案のアプローチは？」";
-const MSG_ERROR = "エラーが発生したため、回答できませんでした。時間をおいてもう一度お試しください。";
+const MSG_TOO_LONG = `質問が長すぎます。${config.limits.maxQuestionChars}文字以内にしてください。`;
+const MSG_ERROR ="エラーが発生したため、回答できませんでした。時間をおいてもう一度お試しください。";
 
 /** 「<@U123> 質問」から、メンション部分を除いて質問だけにする */
 export function stripMentions(text: string): string {
@@ -56,6 +58,8 @@ export async function handleQuestion(msg: SlackQuestion, deps: HandlerDeps): Pro
 
     const question = stripMentions(msg.text);
     if (!question) return await reply(MSG_EMPTY);
+    // 長すぎる質問は、記録・検索・回答生成のどれにも回さない（Web の検索語と同じ上限）
+    if (question.length > config.limits.maxQuestionChars) return await reply(MSG_TOO_LONG);
     const logId = await deps.begin(userId, question);
     if (logId === null) return await reply(MSG_QUOTA);
 

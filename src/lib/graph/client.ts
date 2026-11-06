@@ -134,8 +134,10 @@ export function createGraphClient(
         throw new GraphHttpError(res.status);
       }
       // サーバーが待ち時間を指定していればそれに従い、無ければ 1秒→2秒→4秒 と伸ばす
-      const retryAfter = Number(res.headers.get("retry-after"));
-      const wait = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1000 : 1000 * 2 ** (attempt - 1);
+      // ヘッダーが無いときの Number(null) は 0 になり、待たずに連打してしまうので、先に「数値の文字列か」を確かめる
+      const header = res.headers.get("retry-after")?.trim() ?? "";
+      const retryAfter = /^\d+(\.\d+)?$/.test(header) ? Number(header) : NaN;
+      const wait = Number.isFinite(retryAfter) ? retryAfter * 1000 : 1000 * 2 ** (attempt - 1);
       await sleep(Math.min(wait, MAX_WAIT_MS));
     }
   }

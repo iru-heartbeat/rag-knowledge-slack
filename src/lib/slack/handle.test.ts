@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnswerResult } from "../rag/answer";
 import type { RetrievedChunk } from "../rag/retrieve";
+import { config } from "../config";
 import { handleQuestion, stripMentions, type HandlerDeps } from "./handle";
 
 const chunk = (id: number): RetrievedChunk => ({
@@ -71,6 +72,21 @@ describe("handleQuestion", () => {
     expect(retrieve).not.toHaveBeenCalled();
     expect(begin).not.toHaveBeenCalled();
     expect(posted(post).text).toContain("質問");
+  });
+
+  it("長すぎる質問（Web と同じ上限を超える）は、記録も検索も回答生成もせず、短くするよう案内する", async () => {
+    const { d, post, begin, retrieve, generate } = deps();
+    await handleQuestion({ ...msg, text: `<@UBOT> ${"あ".repeat(config.limits.maxQuestionChars + 1)}` }, d);
+    expect(begin).not.toHaveBeenCalled();
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+    expect(posted(post).text).toContain(`${config.limits.maxQuestionChars}文字以内`);
+  });
+
+  it("上限ちょうどの長さの質問は受け付ける", async () => {
+    const { d, begin } = deps();
+    await handleQuestion({ ...msg, text: `<@UBOT> ${"あ".repeat(config.limits.maxQuestionChars)}` }, d);
+    expect(begin).toHaveBeenCalled();
   });
 
   it("質問者のIDと、メンションを除いた質問で検索し、回答をスレッドに返す", async () => {

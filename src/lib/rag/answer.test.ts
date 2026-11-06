@@ -108,11 +108,30 @@ describe("generateAnswer", () => {
     expect(r.sources).toHaveLength(1);
   });
 
-  it("引用が1つも無い回答は、渡した根拠すべてを参考として載せる", async () => {
+  it("引用が1つも無い回答は、出典なしにはせず、渡した根拠のうち類似度の高い上位を参考として載せる", async () => {
     const { client } = fakeClient({ text: "引用なしの答え" });
     const r = await generateAnswer("q", [chunk(1), chunk(2)], { client });
     expect(r.status).toBe("answered");
     expect(r.sources).toHaveLength(2);
+  });
+
+  it("引用が無いときの参考は、上位3件までに絞る（関係の薄い文書まで出典として並べない）", async () => {
+    const { client } = fakeClient({ text: "引用なしの答え" });
+    const chunks = [1, 2, 3, 4, 5, 6].map((n) => chunk(n));
+    const r = await generateAnswer("q", chunks, { client });
+    expect(r.sources.map((s) => s.title)).toEqual(["文書1.pdf", "文書2.pdf", "文書3.pdf"]); // 検索結果は類似度の高い順
+  });
+
+  it("範囲外の番号だけを引用した回答も、引用なしと同じ扱い（上位3件まで）", async () => {
+    const { client } = fakeClient({ text: "答え [9]" });
+    const r = await generateAnswer("q", [1, 2, 3, 4].map((n) => chunk(n)), { client });
+    expect(r.sources).toHaveLength(3);
+  });
+
+  it("引用があるときは、引用された出典だけを返す（件数の絞りの影響を受けない）", async () => {
+    const { client } = fakeClient({ text: "A [1] B [2] C [3] D [4] E [5]" });
+    const r = await generateAnswer("q", [1, 2, 3, 4, 5].map((n) => chunk(n)), { client });
+    expect(r.sources).toHaveLength(5);
   });
 
   it("モデルが NOT_FOUND と返したら『見つかりません』（出典なし）", async () => {

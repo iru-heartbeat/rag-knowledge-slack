@@ -39,7 +39,7 @@ export type RetrieveDeps = {
   embed?: (text: string) => Promise<number[]>;
 };
 
-const MAX_QUESTION_CHARS = 1000;
+const MAX_QUESTION_CHARS = config.limits.maxQuestionChars;
 const MIN_TOP_K = 1;
 const MAX_TOP_K = 20;
 

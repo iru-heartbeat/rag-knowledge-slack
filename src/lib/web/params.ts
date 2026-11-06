@@ -1,3 +1,4 @@
+import { config } from "../config";
 import type { SearchFilters } from "../rag/retrieve";
 
 export type ParsedSearch =
@@ -5,7 +6,7 @@ export type ParsedSearch =
   | { kind: "error"; message: string }
   | { kind: "ok"; question: string; filters: SearchFilters };
 
-const MAX_QUERY = 1000;
+const MAX_QUERY = config.limits.maxQuestionChars;
 const MAX_CUSTOMER = 100;
 
 type Raw = Record<string, string | string[] | undefined>;

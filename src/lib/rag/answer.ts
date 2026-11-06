@@ -119,13 +119,20 @@ function buildUserMessage(question: string, chunks: RetrievedChunk[]): string {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** モデルが引用番号を付けなかったときに、参考として載せる件数の上限 */
+const FALLBACK_SOURCE_COUNT = 3;
+
 /** 回答中の [n] から出典を作る。存在しない番号は無視し、同じ文書・見出しは1つにまとめる */
 function pickSources(answer: string, chunks: RetrievedChunk[]): AnswerSource[] {
   const cited = [...answer.matchAll(/\[(\d+)\]/g)]
     .map((m) => Number(m[1]))
     .filter((n) => n >= 1 && n <= chunks.length);
-  // 引用が1つも無いときは、渡した根拠すべてを「参考」として載せる（出典なしの回答にしない）
-  const indexes = cited.length > 0 ? [...new Set(cited)] : chunks.map((_, i) => i + 1);
+  // 引用が1つも無いときは、出典なしの回答にはせず、根拠のうち上位だけを「参考」として載せる。
+  // 検索結果は類似度の高い順なので、先頭から数件でよい（全てを載せると、関係の薄い文書まで出典に見えてしまう）
+  const indexes =
+    cited.length > 0
+      ? [...new Set(cited)]
+      : chunks.slice(0, FALLBACK_SOURCE_COUNT).map((_, i) => i + 1);
 
   const seen = new Set<string>();
   const sources: AnswerSource[] = [];

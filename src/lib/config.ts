@@ -39,6 +39,8 @@ export const config = {
     questionsPerHour: 60,
     // 取り込むファイルの大きさの上限。大きすぎると関数のメモリが足りず、同期ごと落ちる
     maxFileBytes: 50 * 1024 * 1024,
+    // 質問・検索語の最大文字数（Slack・Web 共通）。巨大な貼り付けで、1回あたりの費用やログが膨らむのを防ぐ
+    maxQuestionChars: 1000,
   },
 
   answer: {
