@@ -93,6 +93,29 @@ describe("extractDepartments", () => {
     });
   });
 
+  describe("部署欄が複数あって食い違うときは、権限を付けない（レビュー指摘: 合算すると権限の付けすぎになる）", () => {
+    it("表紙の「部署: 戦略」と、別の行の「担当部署: 人事」が違えば、どちらにも権限を付けず、管理者の確認に回す", () => {
+      const r = extractDepartments(doc("提案書\n部署: 戦略 / 客先: A社\n体制\n担当部署: 人事"), DEPTS);
+      expect(r.departments).toEqual([]);
+      expect(r.unmatched.sort()).toEqual(["人事", "戦略"]);
+    });
+
+    it("1つが登録名に一致し、もう1つが一致しないときも、一致した方だけに権限を付けない", () => {
+      const r = extractDepartments(doc("部署：営業\n所属：存在しない部"), DEPTS);
+      expect(r.departments).toEqual([]);
+      expect(r.unmatched.sort()).toEqual(["営業", "存在しない部"]);
+    });
+
+    it("同じ内容を複数の場所に書いているだけなら、そのまま採用する", () => {
+      expect(extractDepartments(doc("部署: 戦略\n担当部署：戦略部"), DEPTS).departments).toEqual(["戦略"]);
+    });
+
+    it("併記の順番が違うだけで同じ集合なら、採用する", () => {
+      const r = extractDepartments(doc("部署: 営業・人事\n担当部署：人事、営業"), DEPTS);
+      expect(r.departments.sort()).toEqual(["人事", "営業"]);
+    });
+  });
+
   it("見出し(title)側に書かれた部署も拾う", () => {
     const r = extractDepartments([{ title: "部署：営業部", text: "本文" }], DEPTS);
     expect(r.departments).toEqual(["営業"]);
